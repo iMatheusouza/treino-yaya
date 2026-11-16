@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Minha Ficha de Treino</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        slate: {
+                            850: '#151e2e',
+                            950: '#0a0f1a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Ajustes finos para usabilidade mobile e animações */
+        body {
+            background-color: #0a0f1a;
+            color: #f8fafc;
+            -webkit-tap-highlight-color: transparent;
+            padding-bottom: 110px; /* Espaço para o cronômetro fixo inferior */
+        }
+
+        /* Esconder barra de rolagem nas abas mantendo scroll horizontal suave */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        /* Animação suave para expandir dica */
+        .tip-content {
+            display: grid;
+            grid-template-rows: 0fr;
+            transition: grid-template-rows 0.25s ease-out;
+        }
+        .tip-content.open {
+            grid-template-rows: 1fr;
+        }
+        .tip-inner {
+            overflow: hidden;
+        }
+
+        /* Animação pulso suave no alerta do timer */
+        @keyframes timerAlert {
+            0%, 100% { background-color: rgba(16, 185, 129, 0.2); border-color: #10b981; }
+            50% { background-color: rgba(16, 185, 129, 0.45); border-color: #34d399; }
+        }
+        .timer-finished {
+            animation: timerAlert 0.8s ease-in-out infinite;
+        }
+
+        /* Remove setas padrão do input number no mobile/desktop */
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { 
+            -webkit-appearance: none; 
+            margin: 0; 
+        }
+        input[type=number] {
+            -moz-appearance: textfield;
+        }
+    </style>
+</head>
+<body class="antialiased selection:bg-emerald-500 selection:text-white">
+
+    <!-- Cabeçalho Fixo com Título e Navegação por Abas -->
+    <header class="sticky top-0 z-30 bg-slate-950/90 backdrop-blur-md border-b border-slate-800/80 shadow-lg">
+        <div class="max-w-lg mx-auto px-4 pt-3 pb-2">
+            <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-lg bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
+                        <!-- Ícone Haltere SVG -->
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="m6.5 6.5 11 11"/><path d="m21 21-1-1"/><path d="m3 3 1 1"/><path d="m18 22 4-4"/><path d="m2 6 4-4"/><path d="m3 10 7-7"/><path d="m14 21 7-7"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h1 class="text-base font-bold tracking-tight text-white leading-none">Ficha de Treino</h1>
+                        <span class="text-[11px] text-slate-400 font-medium">Progresso & Cargas Salvos</span>
+                    </div>
+                </div>
+                
+                <!-- Badge de Status de Salvamento -->
+                <span id="save-indicator" class="text-[11px] font-medium px-2.5 py-1 rounded-full bg-slate-900 text-slate-400 border border-slate-800 transition-opacity duration-300 opacity-0">
+                    Salvo ✓
+                </span>
+            </div>
+
+            <!-- Navegação por Abas (Scroll Horizontal no Mobile) -->
+            <nav class="flex gap-1.5 overflow-x-auto no-scrollbar pb-1" id="tabs-container" role="tablist">
+                <!-- Abas renderizadas via JS -->
+            </nav>
+        </div>
+
+        <!-- Barra de Progresso do Treino Atual -->
+        <div class="max-w-lg mx-auto px-4 pb-3 pt-1">
+            <div class="flex justify-between items-center text-xs mb-1.5">
+                <span id="workout-subtitle" class="font-semibold text-slate-300 truncate pr-2">Treino A</span>
+                <span id="progress-text" class="font-bold text-emerald-400 shrink-0">0/6 concluídos (0%)</span>
+            </div>
+            <div class="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+                <div id="progress-bar" class="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full transition-all duration-300 ease-out" style="width: 0%"></div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Conteúdo Principal: Lista de Exercícios -->
+    <main class="max-w-lg mx-auto px-4 pt-4">
+        <div id="exercises-list" class="space-y-3">
+            <!-- Cards de exercícios injetados via JS -->
+        </div>
+
+        <!-- Botão Finalizar / Resetar Treino -->
+        <div class="mt-6 mb-4">
+            <button id="reset-workout-btn" onclick="confirmResetWorkout()" class="w-full py-3.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 active:scale-[0.99] border border-slate-700/80 text-slate-300 font-semibold text-sm flex items-center justify-center gap-2 transition-all shadow-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>
+                </svg>
+                <span>Finalizar / Resetar Treino do Dia</span>
+            </button>
+            <p class="text-center text-[11px] text-slate-500 mt-2">
+                Desmarca os exercícios concluídos, mantendo suas cargas (kg) salvas.
+            </p>
+        </div>
+    </main>
+
+    <!-- Modal Customizado de Confirmação / Aviso (Substitui alert/confirm) -->
+    <div id="custom-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-sm w-full p-5 shadow-2xl transform transition-all">
+            <h3 id="modal-title" class="text-lg font-bold text-white mb-2">Finalizar Treino?</h3>
+            <p id="modal-message" class="text-sm text-slate-300 mb-5 leading-relaxed">
+                Isso vai desmarcar todos os exercícios desta aba para o seu próximo treino. Suas anotações de peso (kg) continuarão salvas!
+            </p>
+            <div class="flex gap-2.5 justify-end">
+                <button onclick="closeModal()" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium transition">
+                    Cancelar
+                </button>
+                <button id="modal-confirm-btn" class="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition shadow-lg shadow-emerald-900/30">
+                    Confirmar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cronômetro de Descanso Flutuante na Base -->
+    <footer id="timer-dock" class="fixed bottom-0 inset-x-0 z-40 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 shadow-[0_-8px_25px_rgba(0,0,0,0.5)] transition-colors duration-300">
+        <div class="max-w-lg mx-auto px-3 py-2.5">
+            <div class="flex items-center justify-between gap-2">
+                
+                <!-- Display do Tempo -->
+                <div class="flex items-center gap-2.5">
+                    <div class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 min-w-[84px] text-center">
+                        <span id="timer-display" class="font-mono text-xl font-extrabold text-white tracking-wider">01:00</span>
+                    </div>
+
+                    <!-- Controles Play/Pause e Reset -->
+                    <div class="flex items-center gap-1.5">
+                        <button id="timer-toggle-btn" onclick="toggleTimer()" aria-label="Iniciar ou Pausar" class="w-10 h-10 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white flex items-center justify-center transition shadow-md shadow-emerald-950">
+                            <!-- Ícone Play -->
+                            <svg id="icon-play" xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 ml-0.5" viewBox="0 0 24 24" fill="currentColor">
+                                <polygon points="5 3 19 12 5 21 5 3"/>
+                            </svg>
+                            <!-- Ícone Pause (escondido inicialmente) -->
+                            <svg id="icon-pause" xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 hidden" viewBox="0 0 24 24" fill="currentColor">
+                                <rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>
+                            </svg>
+                        </button>
+
+                        <button onclick="resetTimer()" aria-label="Zerar Cronômetro" class="w-10 h-10 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 flex items-center justify-center transition border border-slate-700/60">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Botões Rápidos de Tempo (45s, 60s, 90s, 120s) -->
+                <div class="grid grid-cols-2 sm:flex gap-1">
+                    <button onclick="setQuickTimer(45)" class="px-2 py-1 text-[11px] font-bold rounded-lg bg-slate-800 hover:bg-slate-700 active:bg-emerald-600 text-slate-200 border border-slate-700/70 transition">45s</button>
+                    <button onclick="setQuickTimer(60)" class="px-2 py-1 text-[11px] font-bold rounded-lg bg-slate-800 hover:bg-slate-700 active:bg-emerald-600 text-slate-200 border border-slate-700/70 transition">60s</button>
+                    <button onclick="setQuickTimer(90)" class="px-2 py-1 text-[11px] font-bold rounded-lg bg-slate-800 hover:bg-slate-700 active:bg-emerald-600 text-slate-200 border border-slate-700/70 transition">90s</button>
+                    <button onclick="setQuickTimer(120)" class="px-2 py-1 text-[11px] font-bold rounded-lg bg-slate-800 hover:bg-slate-700 active:bg-emerald-600 text-slate-200 border border-slate-700/70 transition">120s</button>
+                </div>
+
+            </div>
+        </div>
+    </footer>
+
+    <!-- Lógica JavaScript Completa -->
+    <script>
+        // ==========================================
+        // 1. DADOS DOS TREINOS (ESTRUTURA COMPLETA)
+        // ==========================================
+        const WORKOUT_DATA = {
+            treinoA: {
+                id: 'treinoA',
+                tabLabel: 'Treino A',
+                tabSub: 'Costas/Ombro/Trí',
+                fullTitle: 'Treino A: Superiores (Costas, Ombros e Tríceps)',
+                exercises: [
+                    {
+                        id: 'a1',
+                        name: 'Puxada na Polia (Pegada Aberta)',
+                        sets: '4x 8-12',
+                        rest: '90s',
+                        defaultRestSec: 90,
+                        tip: 'Estufe o peito, puxe a barra em direção à parte superior do peitoral e evite balançar o tronco.'
+                    },
+                    {
+                        id: 'a2',
+                        name: 'Puxada na Polia (Pegada Fechada / Triângulo)',
+                        sets: '4x 10-12',
+                        rest: '90s',
+                        defaultRestSec: 90,
+                        tip: 'Mantenha os cotovelos próximos ao corpo, puxe até a linha do queixo/peito e controle a subida.'
+                    },
+                    {
+                        id: 'a3',
+                        name: 'Crucifixo Invertido',
+                        sets: '3x 12-15',
+                        rest: '60s',
+                        defaultRestSec: 60,
+                        tip: 'Mantenha os cotovelos levemente flexionados e abra os braços focando na parte posterior dos ombros e meio das costas.'
+                    },
+                    {
+                        id: 'a4',
+                        name: 'Desenvolvimento na Máquina',
+                        sets: '3x 10-12',
+                        rest: '90s',
+                        defaultRestSec: 90,
+                        tip: 'Ajuste o banco para que as manoplas fiquem na linha dos ombros; empurre sem travar totalmente os cotovelos no topo.'
+                    },
+                    {
+                        id: 'a5',
+                        name: 'Elevação Lateral',
+                        sets: '3x 12-15',
+                        rest: '60s',
+                        defaultRestSec: 60,
+                        tip: 'Suba os halteres até a altura dos ombros com os cotovelos levemente à frente do tronco, sem usar impulso da lombar.'
+                    },
+                    {
+                        id: 'a6',
+                        name: 'Tríceps na Polia (Pulley)',
+                        sets: '3x 10-12',
+                        rest: '60s',
+                        defaultRestSec: 60,
+                        tip: 'Mantenha os cotovelos colados ao lado do tronco e estenda totalmente os braços na descida.'
+                    }
+                ]
+            },
+            treinoB: {
+                id: 'treinoB',
+                tabLabel: 'Treino B',
+                tabSub: 'Inferiores',
+                fullTitle: 'Treino B: Membros Inferiores (Série Otimizada)',
+                exercises: [
+                    {
+                        id: 'b1',
+                        name: 'Cadeira Abdutora (Aquecimento)',
+                        sets: '3x 15',
+                        rest: '60s',
+                        defaultRestSec: 60,
+                        tip: 'Mantenha a coluna apoiada, abra bem os joelhos e segure 1 segundo na contração máxima.'
+                    },
+                    {
+                        id: 'b2',
+                        name: 'Cadeira Adutora (Ativação)',
+                        sets: '3x 15',
+                        rest: '60s',
+                        defaultRestSec: 60,
+                        tip: 'Controle o retorno do aparelho para não bater as placas e manter tensão constante.'
+                    },
+                    {
+                        id: 'b3',
+                        name: 'Leg Press 45º (Carga principal)',
+                        sets: '4x 8-12',
+                        rest: '120s',
+                        defaultRestSec: 120,
+                        tip: 'Pés na largura dos ombros, não tire a lombar do encosto e não trave os joelhos na subida.'
+                    },
+                    {
+                        id: 'b4',
+                        name: 'Cadeira Extensora',
+                        sets: '4x 10-12',
+                        rest: '60s',
+                        defaultRestSec: 60,
+                        tip: 'Alinhe o eixo do joelho com o eixo da máquina e estenda completamente as pernas.'
+                    },
+                    {
+                        id: 'b5',
+                        name: 'Leg Horizontal',
+                        sets: '3x 12-15',
+                        rest: '90s',
+                        defaultRestSec: 90,
+                        tip: 'Movimento contínuo e controlado, empurrando pelos calcanhares para ativar bem coxas e glúteos.'
+                    },
+                    {
+                        id: 'b6',
+                        name: 'Cadeira Flexora',
+                        sets: '4x 10-12',
+                        rest: '60s',
+                        defaultRestSec: 60,
+                        tip: 'Mantenha o quadril firme no banco e puxe o rolo o máximo possível para baixo.'
+                    }
+                ]
+            },
+            treinoC: {
+                id: 'treinoC',
+                tabLabel: 'Treino C',
+                tabSub: 'Peito/Costas/Bíc',
+                fullTitle: 'Treino C: Superiores (Peito, Costas e Bíceps)',
+                exercises: [
+                    {
+                        id: 'c1',
+                        name: 'Supino Reto',
+                        sets: '4x 8-12',
+                        rest: '90s',
+                        defaultRestSec: 90,
+                        tip: 'Escápulas fechadas no banco, desça a barra/manoplas até a linha média do peito.'
+                    },
+                    {
+                        id: 'c2',
+                        name: 'Supino Inclinado com Halteres',
+                        sets: '3x 10-12',
+                        rest: '90s',
+                        defaultRestSec: 90,
+                        tip: 'Banco inclinado a 30-45º, cotovelos levemente fechados em relação aos ombros.'
+                    },
+                    {
+                        id: 'c3',
+                        name: 'Remada Baixa (Triângulo ou Máquina)',
+                        sets: '4x 10-12',
+                        rest: '90s',
+                        defaultRestSec: 90,
+                        tip: 'Coluna reta, puxe o triângulo em direção ao umbigo esmagando as escápulas atrás.'
+                    },
+                    {
+                        id: 'c4',
+                        name: 'Remada Serrote (Unilateral com Halter)',
+                        sets: '3x 10-12',
+                        rest: '60s',
+                        defaultRestSec: 60,
+                        tip: 'Apoie bem uma mão no banco, mantenha as costas paralelas ao chão e puxe o halter em direção ao quadril.'
+                    },
+                    {
+                        id: 'c5',
+                        name: 'Rosca Direta',
+                        sets: '3x 10-12',
+                        rest: '60s',
+                        defaultRestSec: 60,
+                        tip: 'Cotovelos fixos ao lado do corpo, sem balançar o tronco para subir o peso.'
+                    },
+                    {
+                        id: 'c6',
+                        name: 'Rosca Martelo',
+                        sets: '3x 12',
+                        rest: '60s',
+                        defaultRestSec: 60,
+                        tip: 'Pegada neutra (palmas voltadas uma para a outra), movimento firme e controlado.'
+                    }
+                ]
+            },
+            abdomen: {
+                id: 'abdomen',
+                tabLabel: 'Abdômen',
+                tabSub: '2-3x/sem',
+                fullTitle: 'Abdômen (2 a 3x na semana)',
+                exercises: [
+                    {
+                        id: 'ab1',
+                        name: 'Abdominal Supra (Máquina ou Colchonete)',
+                        sets: '3x 15-20',
+                        rest: '45s',
+                        defaultRestSec: 45,
+                        tip: 'Solte o ar ao subir e contraia bem o abdômen sem puxar o pescoço com as mãos.'
+                    },
+                    {
+                        id: 'ab2',
+                        name: 'Prancha Abdominal',
+                        sets: '3x 45-60s',
+                        rest: '45s',
+                        defaultRestSec: 45,
+                        tip: 'Contraia glúteos e abdômen mantendo o corpo alinhado, sem deixar o quadril cair.'
+                    },
+                    {
+                        id: 'ab3',
+                        name: 'Abdominal Infra (Elevação de pernas)',
+                        sets: '3x 12-15',
+                        rest: '45s',
+                        defaultRestSec: 45,
+                        tip: 'Mantenha a lombar apoiada no colchonete/encosto e controle a descida das pernas.'
+                    },
+                    {
+                        id: 'ab4',
+                        name: 'Abdominal Oblíquo (Polia ou rotação)',
+                        sets: '3x 15 (cada lado)',
+                        rest: '45s',
+                        defaultRestSec: 45,
+                        tip: 'Gire o tronco de forma controlada focando na lateral do abdômen.'
+                    }
+                ]
+            }
+        };
+
+        // ==========================================
+        // 2. GERENCIAMENTO DE ESTADO (LOCALSTORAGE)
+        // ==========================================
+        const STORAGE_KEY = 'ficha_treino_app_v1';
+
+        let appState = {
+            activeTab: 'treinoA',
+            completed: {}, // ex: { 'a1': true, 'b3': false }
+            weights: {},   // ex: { 'a1': '45', 'b3': '160' }
+            openTips: {}   // estado temporário de dicas abertas
+        };
+
+        // Carregar estado salvo no navegador
+        function loadState() {
+            try {
+                const saved = localStorage.getItem(STORAGE_KEY);
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    appState.activeTab = parsed.activeTab || 'treinoA';
+                    appState.completed = parsed.completed || {};
+                    appState.weights = parsed.weights || {};
+                }
+            } catch (e) {
+                console.error('Erro ao ler localStorage:', e);
+            }
+        }
+
+        // Salvar estado no navegador e mostrar indicador sutil
+        let saveTimeout;
+        function saveState() {
+            try {
+                const toSave = {
+                    activeTab: appState.activeTab,
+                    completed: appState.completed,
+                    weights: appState.weights
+                };
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
+                
+                // Mostrar feedback visual rápido
+                const indicator = document.getElementById('save-indicator');
+                indicator.classList.remove('opacity-0');
+                clearTimeout(saveTimeout);
+                saveTimeout = setTimeout(() => {
+                    indicator.classList.add('opacity-0');
+                }, 1500);
+            } catch (e) {
+                console.error('Erro ao salvar no localStorage:', e);
+            }
+        }
+
+        // ==========================================
+        // 3. RENDERIZAÇÃO DA INTERFACE
+        // ==========================================
+        function renderTabs() {
+            const container = document.getElementById('tabs-container');
+            container.innerHTML = '';
+
+            Object.values(WORKOUT_DATA).forEach(workout => {
+                const isActive = appState.activeTab === workout.id;
+                
+                // Verifica se todos os exercícios da aba estão concluídos
+                const total = workout.exercises.length;
+                const done = workout.exercises.filter(ex => appState.completed[ex.id]).length;
+                const allDone = total > 0 && done === total;
+
+                const btn = document.createElement('button');
+                btn.setAttribute('role', 'tab');
+                btn.setAttribute('aria-selected', isActive);
+                btn.onclick = () => switchTab(workout.id);
+
+                btn.className = `flex-1 min-w-[82px] py-2 px-2.5 rounded-xl text-left transition-all border ${
+                    isActive 
+                        ? 'bg-emerald-500/15 border-emerald-500/50 text-white shadow-sm' 
+                        : 'bg-slate-900/70 border-slate-800/80 text-slate-400 hover:bg-slate-800/70 hover:text-slate-200'
+                }`;
+
+                btn.innerHTML = `
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold ${isActive ? 'text-emerald-400' : ''}">${workout.tabLabel}</span>
+                        ${allDone ? '<span class="w-2 h-2 rounded-full bg-emerald-400"></span>' : ''}
+                    </div>
+                    <div class="text-[10px] truncate opacity-80 mt-0.5">${workout.tabSub}</div>
+                `;
+
+                container.appendChild(btn);
+            });
+        }
+
+        function updateProgress() {
+            const currentWorkout = WORKOUT_DATA[appState.activeTab];
+            const total = currentWorkout.exercises.length;
+            const completedCount = currentWorkout.exercises.filter(ex => appState.completed[ex.id]).length;
+            const percentage = total > 0 ? Math.round((completedCount / total) * 100) : 0;
+
+            document.getElementById('workout-subtitle').textContent = currentWorkout.fullTitle;
+            document.getElementById('progress-text').textContent = `${completedCount}/${total} concluídos (${percentage}%)`;
+            document.getElementById('progress-bar').style.width = `${percentage}%`;
+        }
+
+        function renderExercises() {
+            const listContainer = document.getElementById('exercises-list');
+            const currentWorkout = WORKOUT_DATA[appState.activeTab];
+            listContainer.innerHTML = '';
+
+            currentWorkout.exercises.forEach((ex, index) => {
+                const isDone = !!appState.completed[ex.id];
+                const savedWeight = appState.weights[ex.id] || '';
+                const isTipOpen = !!appState.openTips[ex.id];
+
+                const card = document.createElement('div');
+                card.className = `rounded-2xl border transition-all duration-200 ${
+                    isDone 
+                        ? 'bg-slate-900/40 border-emerald-500/30 opacity-75' 
+                        : 'bg-slate-900 border-slate-800 shadow-md'
+                }`;
+
+                card.innerHTML = `
+                    <div class="p-3.5">
+                        <div class="flex items-start gap-3.5">
+                            <!-- Área de Toque Grande para o Checkbox -->
+                            <button onclick="toggleExercise('${ex.id}')" aria-label="Marcar ${ex.name}" 
+                                class="mt-0.5 w-8 h-8 rounded-xl flex items-center justify-center shrink-0 transition-all active:scale-90 border-2 ${
+                                    isDone 
+                                        ? 'bg-emerald-500 border-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20' 
+                                        : 'bg-slate-950 border-slate-600 hover:border-emerald-400 text-transparent'
+                                }">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 stroke-[3]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="20 6 9 17 4 12"/>
+                                </svg>
+                            </button>
+
+                            <!-- Informações do Exercício -->
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-start justify-between gap-2">
+                                    <h3 onclick="toggleExercise('${ex.id}')" class="text-[15px] font-bold leading-snug cursor-pointer select-none transition-all ${
+                                        isDone ? 'line-through text-slate-400' : 'text-slate-100'
+                                    }">
+                                        <span class="text-xs font-semibold text-slate-500 mr-1">${index + 1}.</span>${ex.name}
+                                    </h3>
+                                </div>
+
+                                <!-- Badges de Séries e Descanso -->
+                                <div class="flex flex-wrap items-center gap-2 mt-2">
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-semibold bg-slate-800 text-emerald-400 border border-slate-700/70">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2.1l4 4-4 4"/><path d="M3 12.2v-2a4 4 0 0 1 4-4h12.8M7 21.9l-4-4 4-4"/><path d="M21 11.8v2a4 4 0 0 1-4 4H4.2"/></svg>
+                                        ${ex.sets}
+                                    </span>
+
+                                    <button onclick="setQuickTimer(${ex.defaultRestSec})" title="Iniciar timer com este descanso" class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-medium bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700/70 transition active:scale-95">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                                        ${ex.rest}
+                                    </button>
+                                </div>
+
+                                <!-- Linha Inferior: Input de Carga (kg) e Botão de Dica -->
+                                <div class="flex items-center justify-between gap-2 mt-3 pt-2.5 border-t border-slate-800/80">
+                                    <!-- Input de Carga -->
+                                    <div class="flex items-center gap-1.5 bg-slate-950 border border-slate-800 focus-within:border-emerald-500/70 rounded-xl px-2.5 py-1 transition">
+                                        <label for="weight-${ex.id}" class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Carga:</label>
+                                        <input 
+                                            type="number" 
+                                            inputmode="decimal"
+                                            step="0.5"
+                                            id="weight-${ex.id}" 
+                                            value="${savedWeight}" 
+                                            placeholder="0"
+                                            oninput="updateWeight('${ex.id}', this.value)"
+                                            class="w-12 bg-transparent text-right font-bold text-sm text-white focus:outline-none placeholder:text-slate-600"
+                                        >
+                                        <span class="text-xs font-semibold text-slate-500">kg</span>
+                                    </div>
+
+                                    <!-- Botão Dica / Execução -->
+                                    <button onclick="toggleTip('${ex.id}')" class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-medium transition ${
+                                        isTipOpen 
+                                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' 
+                                            : 'bg-slate-800/70 hover:bg-slate-800 text-slate-300 border border-slate-700/50'
+                                    }">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                                        <span>Dica</span>
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 transition-transform duration-200 ${isTipOpen ? 'rotate-180' : ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Conteúdo Expansível da Dica -->
+                        <div id="tip-box-${ex.id}" class="tip-content ${isTipOpen ? 'open' : ''}">
+                            <div class="tip-inner">
+                                <div class="mt-3 p-3 rounded-xl bg-slate-950/90 border border-slate-800/90 text-xs text-slate-300 leading-relaxed flex gap-2">
+                                    <span class="text-emerald-400 font-bold shrink-0">Execução:</span>
+                                    <span>${ex.tip}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                listContainer.appendChild(card);
+            });
+        }
+
+        // ==========================================
+        // 4. INTERAÇÕES DOS EXERCÍCIOS E ABAS
+        // ==========================================
+        function switchTab(tabId) {
+            appState.activeTab = tabId;
+            saveState();
+            renderTabs();
+            updateProgress();
+            renderExercises();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function toggleExercise(exId) {
+            appState.completed[exId] = !appState.completed[exId];
+            saveState();
+            renderTabs();
+            updateProgress();
+            renderExercises();
+        }
+
+        function updateWeight(exId, value) {
+            appState.weights[exId] = value;
+            saveState();
+        }
+
+        function toggleTip(exId) {
+            appState.openTips[exId] = !appState.openTips[exId];
+            const tipBox = document.getElementById(`tip-box-${exId}`);
+            if (tipBox) {
+                tipBox.classList.toggle('open');
+                // Atualiza estilo do botão sem perder foco do input se houver
+                renderExercises();
+            }
+        }
+
+        // ==========================================
+        // 5. MODAL E RESET DE TREINO
+        // ==========================================
+        function confirmResetWorkout() {
+            const currentWorkout = WORKOUT_DATA[appState.activeTab];
+            const modal = document.getElementById('custom-modal');
+            document.getElementById('modal-title').textContent = `Finalizar ${currentWorkout.tabLabel}?`;
+            document.getElementById('modal-message').textContent = `Todos os exercícios marcados em "${currentWorkout.tabLabel}" serão desmarcados para o próximo treino. Suas anotações de carga (kg) permanecerão salvas!`;
+            
+            const confirmBtn = document.getElementById('modal-confirm-btn');
+            confirmBtn.onclick = () => {
+                resetCurrentWorkout();
+                closeModal();
+            };
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('custom-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function resetCurrentWorkout() {
+            const currentWorkout = WORKOUT_DATA[appState.activeTab];
+            currentWorkout.exercises.forEach(ex => {
+                delete appState.completed[ex.id];
+            });
+            saveState();
+            renderTabs();
+            updateProgress();
+            renderExercises();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // ==========================================
+        // 6. CRONÔMETRO DE DESCANSO + WEB AUDIO API
+        // ==========================================
+        let timerSeconds = 60;
+        let lastSelectedSeconds = 60;
+        let timerInterval = null;
+        let isTimerRunning = false;
+        let audioCtx = null;
+
+        // Gera bipe suave usando Web Audio API sem depender de arquivos mp3 externos
+        function playBeepSound() {
+            try {
+                if (!audioCtx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    audioCtx = new AudioContext();
+                }
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+
+                // Toca dois bipes suaves de conclusão
+                const now = audioCtx.currentTime;
+                [0, 0.22].forEach((offset, i) => {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(i === 0 ? 660 : 880, now + offset);
+                    
+                    gain.gain.setValueAtTime(0.001, now + offset);
+                    gain.gain.exponentialRampToValueAtTime(0.25, now + offset + 0.03);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + offset + 0.18);
+                    
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    
+                    osc.start(now + offset);
+                    osc.stop(now + offset + 0.19);
+                });
+            } catch (e) {
+                console.warn('Áudio não suportado ou bloqueado:', e);
+            }
+        }
+
+        function formatTime(sec) {
+            const m = Math.floor(sec / 60).toString().padStart(2, '0');
+            const s = (sec % 60).toString().padStart(2, '0');
+            return `${m}:${s}`;
+        }
+
+        function updateTimerUI() {
+            const display = document.getElementById('timer-display');
+            const playIcon = document.getElementById('icon-play');
+            const pauseIcon = document.getElementById('icon-pause');
+            const toggleBtn = document.getElementById('timer-toggle-btn');
+
+            display.textContent = formatTime(timerSeconds);
+
+            if (isTimerRunning) {
+                playIcon.classList.add('hidden');
+                pauseIcon.classList.remove('hidden');
+                toggleBtn.classList.remove('bg-emerald-600', 'hover:bg-emerald-500');
+                toggleBtn.classList.add('bg-amber-500', 'hover:bg-amber-400', 'text-slate-950');
+            } else {
+                playIcon.classList.remove('hidden');
+                pauseIcon.classList.add('hidden');
+                toggleBtn.classList.add('bg-emerald-600', 'hover:bg-emerald-500', 'text-white');
+                toggleBtn.classList.remove('bg-amber-500', 'hover:bg-amber-400', 'text-slate-950');
+            }
+        }
+
+        function clearTimerAlert() {
+            const dock = document.getElementById('timer-dock');
+            const display = document.getElementById('timer-display');
+            dock.classList.remove('timer-finished');
+            display.classList.remove('text-emerald-400');
+            display.classList.add('text-white');
+        }
+
+        function toggleTimer() {
+            // Inicializa contexto de áudio no primeiro toque do usuário
+            if (!audioCtx) {
+                try {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    audioCtx = new AudioContext();
+                } catch (e) {}
+            }
+
+            clearTimerAlert();
+
+            if (isTimerRunning) {
+                clearInterval(timerInterval);
+                isTimerRunning = false;
+                updateTimerUI();
+            } else {
+                if (timerSeconds <= 0) {
+                    timerSeconds = lastSelectedSeconds;
+                }
+                isTimerRunning = true;
+                updateTimerUI();
+
+                timerInterval = setInterval(() => {
+                    timerSeconds--;
+                    updateTimerUI();
+
+                    if (timerSeconds <= 0) {
+                        clearInterval(timerInterval);
+                        isTimerRunning = false;
+                        updateTimerUI();
+                        triggerTimerFinished();
+                    }
+                }, 1000);
+            }
+        }
+
+        function setQuickTimer(seconds) {
+            clearTimerAlert();
+            clearInterval(timerInterval);
+            lastSelectedSeconds = seconds;
+            timerSeconds = seconds;
+            isTimerRunning = false;
+            updateTimerUI();
+            // Inicia automaticamente ao clicar em um tempo rápido
+            toggleTimer();
+        }
+
+        function resetTimer() {
+            clearTimerAlert();
+            clearInterval(timerInterval);
+            isTimerRunning = false;
+            timerSeconds = lastSelectedSeconds;
+            updateTimerUI();
+        }
+
+        function triggerTimerFinished() {
+            playBeepSound();
+            // Vibração no celular se disponível
+            if (navigator.vibrate) {
+                navigator.vibrate([200, 100, 200]);
+            }
+            const dock = document.getElementById('timer-dock');
+            const display = document.getElementById('timer-display');
+            dock.classList.add('timer-finished');
+            display.classList.remove('text-white');
+            display.classList.add('text-emerald-400');
+        }
+
+        // ==========================================
+        // 7. INICIALIZAÇÃO DO APLICATIVO
+        // ==========================================
+        document.addEventListener('DOMContentLoaded', () => {
+            loadState();
+            renderTabs();
+            updateProgress();
+            renderExercises();
+            updateTimerUI();
+        });
+    </script>
+</body>
+</html>
